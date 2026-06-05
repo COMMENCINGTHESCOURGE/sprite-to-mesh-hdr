@@ -1,0 +1,47 @@
+name: Sprite-to-Mesh-HDR Pipeline CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - name: Test sprite extraction
+        run: |
+          # Create test sprite sheet
+          node -e "
+            const sharp = require('sharp');
+            const fs = require('fs-extra');
+            sharp({
+              create: { width: 256, height: 256, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } }
+            })
+            .composite([
+              { input: Buffer.from([255,0,0,255]), raw: {width:64,height:64,channels:4}, left:0, top:0 },
+              { input: Buffer.from([0,255,0,255]), raw: {width:64,height:64,channels:4}, left:64, top:0 },
+              { input: Buffer.from([0,0,255,255]), raw: {width:64,height:64,channels:4}, left:128, top:0 },
+              { input: Buffer.from([255,255,0,255]), raw: {width:64,height:64,channels:4}, left:192, top:0 }
+            ])
+            .png()
+            .toFile('test-spritesheet.png');
+          "
+          node dist/cli.js sprite-extract -i test-spritesheet.png -o test-frames --cols 4 --rows 1
+          ls test-frames/
+      - name: Test mesh generation
+        run: |
+          node dist/cli.js mesh-gen -i test-frames -o test-meshes --type card
+          ls test-meshes/
+      - name: Test HDR refinery
+        run: |
+          node dist/cli.js hdr-refine -i test-meshes -o test-hdr --resolution 128
+          ls test-hdr/
