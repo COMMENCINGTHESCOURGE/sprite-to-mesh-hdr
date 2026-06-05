@@ -107,7 +107,8 @@ export class HDRRefinery {
       pz: [0, 0, 1], nz: [0, 0, -1]
     };
     
-    const [nx, ny, nz] = normals[face];
+    const faceKey = face.endsWith('.png') ? face.slice(0, -4) : face;
+    const [nx, ny, nz] = normals[faceKey] || [0, 0, 0];
     
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
@@ -160,12 +161,12 @@ export class HDRRefinery {
     const faceData = JSON.parse(await fs.readFile(cubemapPath, 'utf-8'));
     
     // Generate blurred faces
-    const faces = faceData.faces || ['px', 'nx', 'py', 'ny', 'pz', 'nz'];
+    const faces = (faceData.faces || ['px', 'nx', 'py', 'ny', 'pz', 'nz']) as string[];
     for (const face of faces) {
       const facePath = path.join(this.config.outputDir, face);
       try {
         const blurred = await sharp(facePath + '.png')
-          .resize(size, size, { fit: 'fill', kernel: sharp.kernel.gaussian })
+          .resize(size, size, { fit: 'fill', kernel: sharp.kernel.lanczos3 })
           .blur(4)
           .png()
           .toBuffer();
@@ -193,7 +194,7 @@ export class HDRRefinery {
     
     // Prefiltered = multiple mip levels with increasing roughness
     const faceData = JSON.parse(await fs.readFile(cubemapPath, 'utf-8'));
-    const faces = faceData.faces || ['px', 'nx', 'py', 'ny', 'pz', 'nz'];
+    const faces = (faceData.faces || ['px', 'nx', 'py', 'ny', 'pz', 'nz']) as string[];
     
     const mipLevels = 5; // roughness 0.0, 0.25, 0.5, 0.75, 1.0
     const mipFiles: string[] = [];

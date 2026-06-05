@@ -1,4 +1,4 @@
-import { Document, Node, Mesh, Primitive, Accessor, Buffer, Attribute, Material, Texture, Image as GLTFImage } from '@gltf-transform/core';
+import { Document, Node, Mesh, Primitive, Accessor, Buffer, Material, Texture } from '@gltf-transform/core';
 import { NodeIO } from '@gltf-transform/core';
 import fs from 'fs-extra';
 import path from 'path';
@@ -29,12 +29,13 @@ export class MeshGenerator {
       
       // Add material with frame texture
       const material = this.createMaterial(doc, framePath);
-      for (const prim of mesh.getPrimitives()) {
+      for (const prim of mesh.listPrimitives()) {
         prim.setMaterial(material);
       }
       
       const outputPath = path.join(this.config.outputDir, `mesh_${i.toString().padStart(4, '0')}.glb`);
-      await io.writeBinary(outputPath, doc);
+      const glb = await io.writeBinary(doc);
+      await fs.writeFile(outputPath, glb);
       meshes.push(outputPath);
     }
     
@@ -156,23 +157,30 @@ export class MeshGenerator {
         break;
     }
     
+    // Create buffer
+    const buffer = doc.createBuffer('mesh_buffer');
+
     // Create accessors
-    const posAccessor = doc.createAccessor(prim.getAttribute('POSITION') || null)
+    const posAccessor = doc.createAccessor('POSITION')
+      .setBuffer(buffer)
       .setArray(new Float32Array(positions))
       .setType(Accessor.Type.VEC3);
     prim.setAttribute('POSITION', posAccessor);
     
-    const uvAccessor = doc.createAccessor(prim.getAttribute('TEXCOORD_0') || null)
+    const uvAccessor = doc.createAccessor('TEXCOORD_0')
+      .setBuffer(buffer)
       .setArray(new Float32Array(uvs))
       .setType(Accessor.Type.VEC2);
     prim.setAttribute('TEXCOORD_0', uvAccessor);
     
     const idxAccessor = doc.createAccessor()
+      .setBuffer(buffer)
       .setArray(new Uint16Array(indices))
       .setType(Accessor.Type.SCALAR);
     prim.setIndices(idxAccessor);
     
     const normAccessor = doc.createAccessor()
+      .setBuffer(buffer)
       .setArray(new Float32Array(normals))
       .setType(Accessor.Type.VEC3);
     prim.setAttribute('NORMAL', normAccessor);
@@ -187,13 +195,16 @@ export class MeshGenerator {
       .setDoubleSided(this.config.type !== 'billboard');
     
     // Note: In production, we'd embed the texture. For now, reference external.
-    const image = doc.createImage('sprite_texture')
-      .setURI(texturePath);
     const texture = doc.createTexture('sprite_texture')
-      .setImage(image)
-      .setSampler(doc.createSampler().setMagFilter(9729).setMinFilter(9987));
+      .setURI(texturePath);
     
     material.setBaseColorTexture(texture);
+    const textureInfo = material.getBaseColorTextureInfo();
+    if (textureInfo) {
+      textureInfo
+        .setMagFilter(9729)
+        .setMinFilter(9987);
+    }
     
     return material;
   }

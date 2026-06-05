@@ -1,3 +1,4 @@
+import { describe, test, expect, beforeAll, afterAll } from 'vitest';
 import { SpriteSheetProcessor } from '../src/stages/sprite-sheet-processor';
 import { MeshGenerator } from '../src/stages/mesh-generator';
 import { HDRRefinery } from '../src/stages/hdr-refinery';
@@ -12,7 +13,7 @@ describe('SpriteSheetProcessor', () => {
   beforeAll(async () => {
     await fs.ensureDir(testDir);
     // Create a 4x1 test sprite sheet (256x64)
-    const composite = sharp({
+    let composite = sharp({
       create: { width: 256, height: 64, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } }
     });
     const frames = [
